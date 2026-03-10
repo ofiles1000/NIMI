@@ -1,5 +1,5 @@
-import { ChangeDetectionStrategy, Component, signal, inject } from '@angular/core';
-import { CommonModule } from '@angular/common';
+import { ChangeDetectionStrategy, Component, signal, inject, PLATFORM_ID } from '@angular/core';
+import { CommonModule, isPlatformBrowser } from '@angular/common';
 import { FormsModule, ReactiveFormsModule, FormBuilder, Validators } from '@angular/forms';
 import { MatIconModule } from '@angular/material/icon';
 import { Gemini } from './gemini';
@@ -32,7 +32,7 @@ import { Gemini } from './gemini';
                 />
               </div>
               <div class="space-y-1">
-                <label for="topic" class="text-xs font-bold uppercase tracking-wider text-slate-500">Topic / Syllabus Point</label>
+                <label for="topic" class="text-xs font-bold uppercase tracking-wider text-slate-500">Topic / Syllabus Point (Optional)</label>
                 <textarea 
                   id="topic"
                   formControlName="topic"
@@ -51,6 +51,7 @@ import { Gemini } from './gemini';
                   <option value="theory">Trade Theory Manual</option>
                   <option value="practical">Trade Practical Guide</option>
                   <option value="brief">Digital Content Brief</option>
+                  <option value="book">Comprehensive Technical Book</option>
                 </select>
               </div>
               <div class="space-y-1">
@@ -85,6 +86,27 @@ import { Gemini } from './gemini';
                   </optgroup>
                 </select>
               </div>
+              
+              <div class="space-y-2">
+                <span id="file-label" class="text-xs font-bold uppercase tracking-wider text-slate-500 block">Reference Document (Optional)</span>
+                <div 
+                  (click)="fileInput.click()"
+                  (keydown.enter)="fileInput.click()"
+                  (keydown.space)="fileInput.click()"
+                  tabindex="0"
+                  role="button"
+                  aria-labelledby="file-label"
+                  class="border-2 border-dashed border-slate-200 rounded-xl p-4 text-center cursor-pointer hover:border-nimi-blue transition-colors focus:ring-2 focus:ring-nimi-blue outline-none"
+                  [class.border-nimi-blue]="uploadedFile()"
+                >
+                  <mat-icon class="text-slate-400">{{ uploadedFile() ? 'check_circle' : 'upload_file' }}</mat-icon>
+                  <p class="text-[10px] text-slate-500 mt-1">
+                    {{ uploadedFile() ? uploadedFile()?.name : 'Upload PDF/Text for context' }}
+                  </p>
+                </div>
+                <input #fileInput type="file" class="hidden" (change)="onFileSelected($event)" accept=".pdf,.txt,.doc,.docx" />
+              </div>
+
               <div class="flex items-center gap-2 py-2">
                 <input type="checkbox" id="includeImage" formControlName="includeImage" class="w-4 h-4 text-nimi-blue rounded border-slate-300 focus:ring-nimi-blue" />
                 <label for="includeImage" class="text-xs font-bold uppercase tracking-wider text-slate-500 cursor-pointer">Include Visual Aid (AI Image)</label>
@@ -170,10 +192,11 @@ import { Gemini } from './gemini';
 export class Generator {
   private fb = inject(FormBuilder);
   private gemini = inject(Gemini);
+  private platformId = inject(PLATFORM_ID);
 
   form = this.fb.group({
     trade: ['', Validators.required],
-    topic: ['', Validators.required],
+    topic: [''],
     format: ['theory', Validators.required],
     language: ['English', Validators.required],
     includeImage: [false]
@@ -182,6 +205,21 @@ export class Generator {
   loading = signal(false);
   content = signal<string | null>(null);
   generatedImage = signal<string | null>(null);
+  uploadedFile = signal<File | null>(null);
+  fileContent = signal<string | null>(null);
+
+  onFileSelected(event: Event) {
+    const target = event.target as HTMLInputElement;
+    const file = target.files?.[0];
+    if (file) {
+      this.uploadedFile.set(file);
+      const reader = new FileReader();
+      reader.onload = (e: ProgressEvent<FileReader>) => {
+        this.fileContent.set(e.target?.result as string);
+      };
+      reader.readAsText(file);
+    }
+  }
 
   async generate() {
     if (this.form.invalid) return;
@@ -191,43 +229,65 @@ export class Generator {
     this.generatedImage.set(null);
 
     const { trade, topic, format, language, includeImage } = this.form.value;
+    const context = this.fileContent() ? `\n\nReference Document Content:\n${this.fileContent()}` : '';
     
     let prompt = "";
+    const baseInstruction = `Generate high-quality, humanized, and standardized instructional material for the ITI trade: ${trade}. 
+    The language should be ${language}, using a version that is easy to understand for vocational students while maintaining technical accuracy.
+    Ensure technical terms are standard and clearly explained. ${context}`;
+
     if (format === 'theory') {
-      prompt = `Generate a comprehensive Trade Theory lesson for the ITI trade: ${trade}. Topic: ${topic}. 
-      Language: ${language}.
+      prompt = `${baseInstruction}
+      Topic: ${topic || 'General Trade Overview'}.
+      Format: Comprehensive Trade Theory Manual.
       Include:
-      1. Introduction
-      2. Learning Objectives
-      3. Detailed Technical Explanation (with subheadings)
-      4. Safety Precautions
-      5. Summary
-      Use Markdown formatting. Maintain technical accuracy.`;
+      1. Introduction (Humanized and engaging)
+      2. Clear Learning Objectives
+      3. Detailed Technical Explanation (Standardized, easy-to-follow subheadings)
+      4. Practical Applications
+      5. Safety Precautions (Critical callouts)
+      6. Summary and Review Questions.
+      Use Markdown formatting.`;
     } else if (format === 'practical') {
-      prompt = `Generate a Trade Practical guide for the ITI trade: ${trade}. Topic: ${topic}.
-      Language: ${language}.
+      prompt = `${baseInstruction}
+      Topic: ${topic || 'Core Practical Skill'}.
+      Format: Trade Practical Guide.
       Include:
-      1. Aim of the Practical
-      2. Tools & Equipment Required (List)
+      1. Aim of the Practical (Clear and concise)
+      2. Tools & Equipment Required (Standardized list)
       3. Raw Materials Required
-      4. Step-by-Step Procedure
-      5. Safety Precautions
-      6. Conclusion/Result
-      Use Markdown formatting. Maintain technical accuracy.`;
-    } else {
-      prompt = `Generate a Digital Content Brief for an e-learning module. Trade: ${trade}. Topic: ${topic}.
-      Language: ${language}.
+      4. Step-by-Step Procedure (Easy to understand, humanized instructions)
+      5. Safety Precautions (Visual/Textual warnings)
+      6. Conclusion/Result.
+      Use Markdown formatting.`;
+    } else if (format === 'book') {
+      prompt = `${baseInstruction}
+      Topic: ${topic || 'Complete Subject Guide'}.
+      Format: Comprehensive Technical Book Chapter.
       Include:
-      1. Video Script Outline (Scene by Scene)
-      2. Simulation Ideas (How to make it interactive)
-      3. Key Visuals/Graphics needed
-      4. Quiz points for the module
-      Use Markdown formatting. Maintain technical accuracy.`;
+      1. Chapter Overview
+      2. Historical Context (Humanized)
+      3. Core Technical Concepts (Deep research, standardized definitions)
+      4. Advanced Techniques
+      5. Industry Standards & Compliance
+      6. Case Studies or Real-world Examples
+      7. Comprehensive Glossary of Terms.
+      Use Markdown formatting.`;
+    } else {
+      prompt = `${baseInstruction}
+      Topic: ${topic || 'Module Overview'}.
+      Format: Digital Content Brief for e-learning.
+      Include:
+      1. Humanized Video Script Outline (Scene by Scene)
+      2. Interactive Simulation Ideas
+      3. Key Visuals/Graphics requirements
+      4. Standardized Quiz points.
+      Use Markdown formatting.`;
     }
 
     const [result, img] = await Promise.all([
       this.gemini.generateContent(prompt),
-      includeImage ? this.gemini.generateImage(`A professional technical illustration for ${trade}: ${topic}. Clear, educational, and detailed.`) : Promise.resolve(null)
+      includeImage ? this.gemini.generateImage(`A professional, standardized technical illustration for ${trade}: ${topic || 'General'}. Clear, educational, and detailed.`) : Promise.resolve(null)
     ]);
 
     this.generatedImage.set(img);
@@ -247,14 +307,14 @@ export class Generator {
   }
 
   copy() {
-    if (this.content()) {
+    if (isPlatformBrowser(this.platformId) && this.content()) {
       navigator.clipboard.writeText(this.content()!.replace(/<[^>]*>/g, ''));
       alert("Content copied to clipboard!");
     }
   }
 
   download() {
-    if (!this.content()) return;
+    if (!isPlatformBrowser(this.platformId) || !this.content()) return;
 
     const htmlContent = `
       <!DOCTYPE html>

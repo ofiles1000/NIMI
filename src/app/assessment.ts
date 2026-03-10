@@ -1,5 +1,5 @@
-import { ChangeDetectionStrategy, Component, signal, inject } from '@angular/core';
-import { CommonModule } from '@angular/common';
+import { ChangeDetectionStrategy, Component, signal, inject, PLATFORM_ID } from '@angular/core';
+import { CommonModule, isPlatformBrowser } from '@angular/common';
 import { FormsModule, ReactiveFormsModule, FormBuilder, Validators } from '@angular/forms';
 import { MatIconModule } from '@angular/material/icon';
 import { Gemini } from './gemini';
@@ -24,14 +24,14 @@ interface Question {
         <p class="text-slate-600">Generate high-quality, tagged assessments for vocational certification.</p>
       </header>
 
-      <div class="bg-white p-8 rounded-3xl shadow-sm border border-slate-200">
-        <form [formGroup]="form" (ngSubmit)="generate()" class="grid md:grid-cols-5 gap-6 items-end">
+      <div class="bg-white p-8 rounded-3xl shadow-sm border border-slate-200 space-y-6">
+        <form [formGroup]="form" (ngSubmit)="generate()" class="grid md:grid-cols-6 gap-6 items-end">
           <div class="md:col-span-1 space-y-1">
             <label for="trade" class="text-xs font-bold uppercase text-slate-500">Trade</label>
             <input id="trade" formControlName="trade" placeholder="e.g. Electrician" class="w-full px-4 py-2 rounded-lg border border-slate-200 outline-none focus:ring-2 focus:ring-nimi-blue" />
           </div>
           <div class="md:col-span-1 space-y-1">
-            <label for="topic" class="text-xs font-bold uppercase text-slate-500">Topic</label>
+            <label for="topic" class="text-xs font-bold uppercase text-slate-500">Topic (Optional)</label>
             <input id="topic" formControlName="topic" placeholder="e.g. AC Motors" class="w-full px-4 py-2 rounded-lg border border-slate-200 outline-none focus:ring-2 focus:ring-nimi-blue" />
           </div>
           <div class="md:col-span-1 space-y-1">
@@ -39,6 +39,7 @@ interface Question {
             <select id="count" formControlName="count" class="w-full px-4 py-2 rounded-lg border border-slate-200 outline-none focus:ring-2 focus:ring-nimi-blue">
               <option [value]="5">5 Qs</option>
               <option [value]="10">10 Qs</option>
+              <option [value]="20">20 Qs</option>
             </select>
           </div>
           <div class="md:col-span-1 space-y-1">
@@ -69,6 +70,22 @@ interface Question {
               </optgroup>
             </select>
           </div>
+          
+          <div class="md:col-span-1 space-y-1">
+            <span id="ref-label" class="text-xs font-bold uppercase text-slate-500 block">Reference (Optional)</span>
+            <button 
+              type="button"
+              (click)="fileInput.click()"
+              aria-labelledby="ref-label"
+              class="w-full px-4 py-2 rounded-lg border border-slate-200 text-xs font-medium text-slate-600 hover:bg-slate-50 transition-colors flex items-center justify-center gap-2 outline-none focus:ring-2 focus:ring-nimi-blue"
+              [class.border-nimi-blue]="uploadedFile()"
+            >
+              <mat-icon class="!text-sm">{{ uploadedFile() ? 'check_circle' : 'upload_file' }}</mat-icon>
+              {{ uploadedFile() ? 'File Added' : 'Upload File' }}
+            </button>
+            <input #fileInput type="file" class="hidden" (change)="onFileSelected($event)" accept=".pdf,.txt,.doc,.docx" />
+          </div>
+
           <button 
             type="submit" 
             [disabled]="form.invalid || loading()"
@@ -169,10 +186,11 @@ interface Question {
 export class Assessment {
   private fb = inject(FormBuilder);
   private gemini = inject(Gemini);
+  private platformId = inject(PLATFORM_ID);
 
   form = this.fb.group({
     trade: ['', Validators.required],
-    topic: ['', Validators.required],
+    topic: [''],
     count: [5, Validators.required],
     language: ['English', Validators.required]
   });
@@ -181,6 +199,21 @@ export class Assessment {
   questions = signal<Question[]>([]);
   showAnswers = signal(false);
   generatedImage = signal<string | null>(null);
+  uploadedFile = signal<File | null>(null);
+  fileContent = signal<string | null>(null);
+
+  onFileSelected(event: Event) {
+    const target = event.target as HTMLInputElement;
+    const file = target.files?.[0];
+    if (file) {
+      this.uploadedFile.set(file);
+      const reader = new FileReader();
+      reader.onload = (e: ProgressEvent<FileReader>) => {
+        this.fileContent.set(e.target?.result as string);
+      };
+      reader.readAsText(file);
+    }
+  }
 
   getCount(diff: string) {
     return this.questions().filter(q => q.difficulty === diff).length;
@@ -204,13 +237,18 @@ export class Assessment {
     this.generatedImage.set(null);
 
     const { trade, topic, count, language } = this.form.value;
-    const prompt = `Generate ${count} high-quality multiple choice questions for the ITI trade: ${trade} on the topic: ${topic}. 
+    const context = this.fileContent() ? `\n\nReference Document Content:\n${this.fileContent()}` : '';
+
+    const prompt = `Generate ${count} high-quality, humanized, and standardized multiple choice questions for the ITI trade: ${trade}. 
+    Topic: ${topic || 'General Trade Knowledge'}.
     Language: ${language}.
+    ${context}
+    
     For each question:
     1. Provide 4 options, 1 correct answer (index 0-3).
     2. Tag difficulty as 'Easy', 'Medium', or 'Hard'.
     3. Tag competency as 'Knowledge', 'Understanding', or 'Application'.
-    4. Provide a detailed technical explanation.
+    4. Provide a detailed, humanized technical explanation that is easy to understand.
     Ensure questions align with NCVT/NIMI assessment standards for CTS/CITS.`;
 
     const schema = {
@@ -247,7 +285,7 @@ export class Assessment {
   }
 
   download() {
-    if (this.questions().length === 0) return;
+    if (!isPlatformBrowser(this.platformId) || this.questions().length === 0) return;
 
     const htmlContent = `
       <!DOCTYPE html>

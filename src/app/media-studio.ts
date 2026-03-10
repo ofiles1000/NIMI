@@ -1,5 +1,5 @@
-import { ChangeDetectionStrategy, Component, signal, inject, OnInit } from '@angular/core';
-import { CommonModule } from '@angular/common';
+import { ChangeDetectionStrategy, Component, signal, inject, OnInit, PLATFORM_ID } from '@angular/core';
+import { CommonModule, isPlatformBrowser } from '@angular/common';
 import { FormsModule, ReactiveFormsModule, FormBuilder, Validators } from '@angular/forms';
 import { MatIconModule } from '@angular/material/icon';
 import { Gemini } from './gemini';
@@ -27,7 +27,7 @@ import { Gemini } from './gemini';
                 <input id="trade" formControlName="trade" placeholder="e.g. Welder" class="w-full px-4 py-2 rounded-lg border border-slate-200 outline-none focus:ring-2 focus:ring-nimi-blue" />
               </div>
               <div class="space-y-1">
-                <label for="topic" class="text-xs font-bold uppercase text-slate-500">Topic</label>
+                <label for="topic" class="text-xs font-bold uppercase text-slate-500">Topic (Optional)</label>
                 <input id="topic" formControlName="topic" placeholder="e.g. Arc Welding" class="w-full px-4 py-2 rounded-lg border border-slate-200 outline-none focus:ring-2 focus:ring-nimi-blue" />
               </div>
               <div class="space-y-1">
@@ -67,6 +67,21 @@ import { Gemini } from './gemini';
                     <option value="Chinese (Mandarin)">Chinese (Mandarin)</option>
                   </optgroup>
                 </select>
+              </div>
+
+              <div class="space-y-2">
+                <span id="media-ref-label" class="text-xs font-bold uppercase text-slate-500 block">Reference (Optional)</span>
+                <button 
+                  type="button"
+                  (click)="fileInput.click()"
+                  aria-labelledby="media-ref-label"
+                  class="w-full px-4 py-2 rounded-lg border border-slate-200 text-xs font-medium text-slate-600 hover:bg-slate-50 transition-colors flex items-center justify-center gap-2 outline-none focus:ring-2 focus:ring-nimi-blue"
+                  [class.border-nimi-blue]="uploadedFile()"
+                >
+                  <mat-icon class="!text-sm">{{ uploadedFile() ? 'check_circle' : 'upload_file' }}</mat-icon>
+                  {{ uploadedFile() ? 'File Added' : 'Upload File' }}
+                </button>
+                <input #fileInput type="file" class="hidden" (change)="onFileSelected($event)" accept=".pdf,.txt,.doc,.docx" />
               </div>
 
               @if (form.get('type')?.value === 'gen-video' && !hasApiKey()) {
@@ -176,10 +191,11 @@ import { Gemini } from './gemini';
 export class MediaStudio implements OnInit {
   private fb = inject(FormBuilder);
   private gemini = inject(Gemini);
+  private platformId = inject(PLATFORM_ID);
 
   form = this.fb.group({
     trade: ['', Validators.required],
-    topic: ['', Validators.required],
+    topic: [''],
     type: ['video', Validators.required],
     language: ['English', Validators.required]
   });
@@ -189,16 +205,35 @@ export class MediaStudio implements OnInit {
   generatedImage = signal<string | null>(null);
   generatedVideo = signal<string | null>(null);
   hasApiKey = signal(false);
+  uploadedFile = signal<File | null>(null);
+  fileContent = signal<string | null>(null);
+
+  onFileSelected(event: Event) {
+    const target = event.target as HTMLInputElement;
+    const file = target.files?.[0];
+    if (file) {
+      this.uploadedFile.set(file);
+      const reader = new FileReader();
+      reader.onload = (e: ProgressEvent<FileReader>) => {
+        this.fileContent.set(e.target?.result as string);
+      };
+      reader.readAsText(file);
+    }
+  }
 
   async ngOnInit() {
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    this.hasApiKey.set(await (window as any).aistudio.hasSelectedApiKey());
+    if (isPlatformBrowser(this.platformId)) {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      this.hasApiKey.set(await (window as any).aistudio.hasSelectedApiKey());
+    }
   }
 
   async selectKey() {
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    await (window as any).aistudio.openSelectKey();
-    this.hasApiKey.set(true);
+    if (isPlatformBrowser(this.platformId)) {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      await (window as any).aistudio.openSelectKey();
+      this.hasApiKey.set(true);
+    }
   }
 
   getIcon() {
@@ -223,41 +258,47 @@ export class MediaStudio implements OnInit {
     this.generatedVideo.set(null);
 
     const { trade, topic, type, language } = this.form.value;
+    const context = this.fileContent() ? `\n\nReference Document Content:\n${this.fileContent()}` : '';
+
+    const baseInstruction = `Generate high-quality, humanized, and standardized media content for the ITI trade: ${trade}. 
+    Topic: ${topic || 'General Trade Overview'}.
+    Language: ${language}.
+    ${context}`;
 
     if (type === 'gen-image') {
-      const prompt = `A professional, high-quality technical illustration for ITI Trade: ${trade}. Topic: ${topic}. Clear, educational, and detailed.`;
+      const prompt = `A professional, high-quality, standardized technical illustration for ITI Trade: ${trade}. Topic: ${topic || 'General'}. Clear, educational, and detailed. ${context}`;
       const img = await this.gemini.generateImage(prompt);
       this.generatedImage.set(img);
     } else if (type === 'gen-video') {
-      const prompt = `A short, educational 3D animation clip demonstrating ${topic} for the ${trade} trade. High quality, technical, and clear.`;
+      const prompt = `A short, educational, humanized 3D animation clip demonstrating ${topic || 'core skills'} for the ${trade} trade. High quality, technical, and clear. ${context}`;
       const video = await this.gemini.generateVideo(prompt);
       this.generatedVideo.set(video);
     } else {
       let prompt = "";
       if (type === 'video') {
-        prompt = `Generate a professional Demo Video Script for ITI Trade: ${trade}. Topic: ${topic}.
-        Language: ${language}.
+        prompt = `${baseInstruction}
+        Format: Professional Demo Video Script.
         Include:
-        1. Scene-by-scene breakdown (Visuals vs Audio/Narration).
+        1. Humanized Scene-by-scene breakdown (Visuals vs Audio/Narration).
         2. Time estimates for each scene.
-        3. Key safety callouts.
+        3. Key safety callouts (Standardized).
         4. On-screen text/graphics overlay suggestions.
         Use Markdown formatting.`;
       } else if (type === 'animation') {
-        prompt = `Generate a 3D Animation Storyboard for ITI Trade: ${trade}. Topic: ${topic}.
-        Language: ${language}.
+        prompt = `${baseInstruction}
+        Format: 3D Animation Storyboard.
         Include:
-        1. Technical breakdown of the 3D model needed (e.g., exploded view of a motor).
-        2. Animation sequence (how parts move, rotate, or highlight).
+        1. Technical breakdown of the 3D model needed (Standardized).
+        2. Humanized Animation sequence (how parts move, rotate, or highlight).
         3. Camera angles and lighting suggestions.
-        4. Educational voiceover script.
+        4. Educational, easy-to-understand voiceover script.
         Use Markdown formatting.`;
       } else {
-        prompt = `Generate 2D Graphic Prompts and Layouts for ITI Trade: ${trade}. Topic: ${topic}.
-        Language: ${language}.
+        prompt = `${baseInstruction}
+        Format: 2D Graphic Prompts and Layouts.
         Include:
-        1. Detailed prompts for AI Image Generators (like DALL-E) to create technical diagrams.
-        2. Infographic layout structure.
+        1. Detailed prompts for AI Image Generators to create standardized technical diagrams.
+        2. Humanized Infographic layout structure.
         3. Labeling requirements for parts.
         4. Color palette suggestions for technical clarity.
         Use Markdown formatting.`;
@@ -280,14 +321,14 @@ export class MediaStudio implements OnInit {
   }
 
   copy() {
-    if (this.result()) {
+    if (isPlatformBrowser(this.platformId) && this.result()) {
       navigator.clipboard.writeText(this.result()!.replace(/<[^>]*>/g, ''));
       alert("Brief copied to clipboard!");
     }
   }
 
   downloadBrief() {
-    if (!this.result()) return;
+    if (!isPlatformBrowser(this.platformId) || !this.result()) return;
 
     const htmlContent = `
       <!DOCTYPE html>

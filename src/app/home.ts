@@ -145,6 +145,19 @@ export class Home {
         "Glossary-consistent terminology",
         "Multi-lingual mock test support"
       ]
+    },
+    {
+      category: "Ecosystem",
+      title: "AI Ecosystem & Prompt Architect",
+      icon: "hub",
+      link: "/ecosystem",
+      description: "Generate optimized prompts for external AI tools like NotebookLM, Claude, and ElevenLabs to enhance your NIMI content production.",
+      points: [
+        "NotebookLM & Claude prompt engineering",
+        "Bhashini & Azure translation prompts",
+        "Synthesia & HeyGen video scripts",
+        "ElevenLabs & Midjourney technical prompts"
+      ]
     }
   ];
 }
