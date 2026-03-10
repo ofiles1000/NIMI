@@ -40,6 +40,34 @@ import { Gemini } from './gemini';
                   <option value="gen-video">Generate AI Video (Demo Clip)</option>
                 </select>
               </div>
+              <div class="space-y-1">
+                <label for="language" class="text-xs font-bold uppercase text-slate-500">Language</label>
+                <select id="language" formControlName="language" class="w-full px-4 py-2 rounded-lg border border-slate-200 outline-none focus:ring-2 focus:ring-nimi-blue">
+                  <optgroup label="Indian Regional">
+                    <option value="English">English</option>
+                    <option value="Hindi">Hindi</option>
+                    <option value="Tamil">Tamil</option>
+                    <option value="Telugu">Telugu</option>
+                    <option value="Marathi">Marathi</option>
+                    <option value="Bengali">Bengali</option>
+                    <option value="Gujarati">Gujarati</option>
+                    <option value="Kannada">Kannada</option>
+                    <option value="Malayalam">Malayalam</option>
+                    <option value="Punjabi">Punjabi</option>
+                  </optgroup>
+                  <optgroup label="International">
+                    <option value="Spanish">Spanish</option>
+                    <option value="French">French</option>
+                    <option value="German">German</option>
+                    <option value="Arabic">Arabic</option>
+                    <option value="Japanese">Japanese</option>
+                    <option value="Russian">Russian</option>
+                    <option value="Portuguese">Portuguese</option>
+                    <option value="Korean">Korean</option>
+                    <option value="Chinese (Mandarin)">Chinese (Mandarin)</option>
+                  </optgroup>
+                </select>
+              </div>
 
               @if (form.get('type')?.value === 'gen-video' && !hasApiKey()) {
                 <div class="p-4 bg-orange-50 border border-orange-100 rounded-xl space-y-3">
@@ -99,7 +127,12 @@ import { Gemini } from './gemini';
             <div class="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
               <div class="p-4 bg-slate-50 border-b border-slate-100 flex justify-between items-center">
                 <span class="text-xs font-bold uppercase text-slate-500 tracking-widest">Generated Media Brief</span>
-                <button (click)="copy()" class="text-nimi-blue hover:underline text-xs font-bold">Copy Text</button>
+                <div class="flex gap-4">
+                  <button (click)="downloadBrief()" class="text-nimi-blue hover:underline text-xs font-bold flex items-center gap-1">
+                    <mat-icon class="!text-sm">download</mat-icon> Download
+                  </button>
+                  <button (click)="copy()" class="text-nimi-blue hover:underline text-xs font-bold">Copy Text</button>
+                </div>
               </div>
               <div class="p-8 prose prose-slate max-w-none" [innerHTML]="result()"></div>
             </div>
@@ -147,7 +180,8 @@ export class MediaStudio implements OnInit {
   form = this.fb.group({
     trade: ['', Validators.required],
     topic: ['', Validators.required],
-    type: ['video', Validators.required]
+    type: ['video', Validators.required],
+    language: ['English', Validators.required]
   });
 
   loading = signal(false);
@@ -188,7 +222,7 @@ export class MediaStudio implements OnInit {
     this.generatedImage.set(null);
     this.generatedVideo.set(null);
 
-    const { trade, topic, type } = this.form.value;
+    const { trade, topic, type, language } = this.form.value;
 
     if (type === 'gen-image') {
       const prompt = `A professional, high-quality technical illustration for ITI Trade: ${trade}. Topic: ${topic}. Clear, educational, and detailed.`;
@@ -202,6 +236,7 @@ export class MediaStudio implements OnInit {
       let prompt = "";
       if (type === 'video') {
         prompt = `Generate a professional Demo Video Script for ITI Trade: ${trade}. Topic: ${topic}.
+        Language: ${language}.
         Include:
         1. Scene-by-scene breakdown (Visuals vs Audio/Narration).
         2. Time estimates for each scene.
@@ -210,6 +245,7 @@ export class MediaStudio implements OnInit {
         Use Markdown formatting.`;
       } else if (type === 'animation') {
         prompt = `Generate a 3D Animation Storyboard for ITI Trade: ${trade}. Topic: ${topic}.
+        Language: ${language}.
         Include:
         1. Technical breakdown of the 3D model needed (e.g., exploded view of a motor).
         2. Animation sequence (how parts move, rotate, or highlight).
@@ -218,6 +254,7 @@ export class MediaStudio implements OnInit {
         Use Markdown formatting.`;
       } else {
         prompt = `Generate 2D Graphic Prompts and Layouts for ITI Trade: ${trade}. Topic: ${topic}.
+        Language: ${language}.
         Include:
         1. Detailed prompts for AI Image Generators (like DALL-E) to create technical diagrams.
         2. Infographic layout structure.
@@ -247,5 +284,41 @@ export class MediaStudio implements OnInit {
       navigator.clipboard.writeText(this.result()!.replace(/<[^>]*>/g, ''));
       alert("Brief copied to clipboard!");
     }
+  }
+
+  downloadBrief() {
+    if (!this.result()) return;
+
+    const htmlContent = `
+      <!DOCTYPE html>
+      <html>
+      <head>
+        <meta charset="UTF-8">
+        <title>NIMI Media Brief - ${this.form.value.topic}</title>
+        <style>
+          body { font-family: sans-serif; line-height: 1.6; color: #333; max-width: 800px; margin: 40px auto; padding: 20px; }
+          h1 { color: #1e3a8a; border-bottom: 2px solid #1e3a8a; padding-bottom: 10px; }
+          h2 { color: #1e40af; margin-top: 30px; }
+          h3 { color: #1e3a8a; }
+          .footer { margin-top: 50px; font-size: 12px; color: #666; text-align: center; border-top: 1px solid #eee; padding-top: 20px; }
+        </style>
+      </head>
+      <body>
+        <div style="text-align: center; color: #666; font-size: 14px; margin-bottom: 20px;">
+          Trade: ${this.form.value.trade} | Language: ${this.form.value.language}
+        </div>
+        ${this.result()}
+        <div class="footer">Generated by NIMI Digital Media Studio</div>
+      </body>
+      </html>
+    `;
+
+    const blob = new Blob([htmlContent], { type: 'text/html' });
+    const url = window.URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `NIMI_MediaBrief_${this.form.value.topic?.replace(/\s+/g, '_')}.html`;
+    a.click();
+    window.URL.revokeObjectURL(url);
   }
 }

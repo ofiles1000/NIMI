@@ -53,6 +53,42 @@ import { Gemini } from './gemini';
                   <option value="brief">Digital Content Brief</option>
                 </select>
               </div>
+              <div class="space-y-1">
+                <label for="language" class="text-xs font-bold uppercase tracking-wider text-slate-500">Language</label>
+                <select 
+                  id="language"
+                  formControlName="language"
+                  class="w-full px-4 py-2 rounded-lg border border-slate-200 focus:ring-2 focus:ring-nimi-blue outline-none"
+                >
+                  <optgroup label="Indian Regional">
+                    <option value="English">English</option>
+                    <option value="Hindi">Hindi</option>
+                    <option value="Tamil">Tamil</option>
+                    <option value="Telugu">Telugu</option>
+                    <option value="Marathi">Marathi</option>
+                    <option value="Bengali">Bengali</option>
+                    <option value="Gujarati">Gujarati</option>
+                    <option value="Kannada">Kannada</option>
+                    <option value="Malayalam">Malayalam</option>
+                    <option value="Punjabi">Punjabi</option>
+                  </optgroup>
+                  <optgroup label="International">
+                    <option value="Spanish">Spanish</option>
+                    <option value="French">French</option>
+                    <option value="German">German</option>
+                    <option value="Arabic">Arabic</option>
+                    <option value="Japanese">Japanese</option>
+                    <option value="Russian">Russian</option>
+                    <option value="Portuguese">Portuguese</option>
+                    <option value="Korean">Korean</option>
+                    <option value="Chinese (Mandarin)">Chinese (Mandarin)</option>
+                  </optgroup>
+                </select>
+              </div>
+              <div class="flex items-center gap-2 py-2">
+                <input type="checkbox" id="includeImage" formControlName="includeImage" class="w-4 h-4 text-nimi-blue rounded border-slate-300 focus:ring-nimi-blue" />
+                <label for="includeImage" class="text-xs font-bold uppercase tracking-wider text-slate-500 cursor-pointer">Include Visual Aid (AI Image)</label>
+              </div>
               <button 
                 type="submit"
                 [disabled]="form.invalid || loading()"
@@ -86,13 +122,18 @@ import { Gemini } from './gemini';
                 <button (click)="copy()" class="p-2 hover:bg-slate-200 rounded-lg transition-colors text-slate-600" title="Copy to Clipboard">
                   <mat-icon class="!text-sm">content_copy</mat-icon>
                 </button>
-                <button (click)="download()" class="p-2 hover:bg-slate-200 rounded-lg transition-colors text-slate-600" title="Download PDF">
-                  <mat-icon class="!text-sm">picture_as_pdf</mat-icon>
+                <button (click)="download()" class="p-2 hover:bg-slate-200 rounded-lg transition-colors text-slate-600" title="Download HTML">
+                  <mat-icon class="!text-sm">download</mat-icon>
                 </button>
               </div>
             </div>
             
             <div class="p-8 flex-1 overflow-auto prose prose-slate max-w-none">
+              @if (generatedImage()) {
+                <div class="mb-8 flex justify-center">
+                  <img [src]="generatedImage()" class="max-w-full h-auto rounded-xl shadow-lg border border-slate-100" alt="Generated visual aid" />
+                </div>
+              }
               @if (content()) {
                 <div [innerHTML]="content()"></div>
               } @else if (loading()) {
@@ -133,32 +174,38 @@ export class Generator {
   form = this.fb.group({
     trade: ['', Validators.required],
     topic: ['', Validators.required],
-    format: ['theory', Validators.required]
+    format: ['theory', Validators.required],
+    language: ['English', Validators.required],
+    includeImage: [false]
   });
 
   loading = signal(false);
   content = signal<string | null>(null);
+  generatedImage = signal<string | null>(null);
 
   async generate() {
     if (this.form.invalid) return;
     
     this.loading.set(true);
     this.content.set(null);
+    this.generatedImage.set(null);
 
-    const { trade, topic, format } = this.form.value;
+    const { trade, topic, format, language, includeImage } = this.form.value;
     
     let prompt = "";
     if (format === 'theory') {
       prompt = `Generate a comprehensive Trade Theory lesson for the ITI trade: ${trade}. Topic: ${topic}. 
+      Language: ${language}.
       Include:
       1. Introduction
       2. Learning Objectives
       3. Detailed Technical Explanation (with subheadings)
       4. Safety Precautions
       5. Summary
-      Use Markdown formatting.`;
+      Use Markdown formatting. Maintain technical accuracy.`;
     } else if (format === 'practical') {
       prompt = `Generate a Trade Practical guide for the ITI trade: ${trade}. Topic: ${topic}.
+      Language: ${language}.
       Include:
       1. Aim of the Practical
       2. Tools & Equipment Required (List)
@@ -166,23 +213,31 @@ export class Generator {
       4. Step-by-Step Procedure
       5. Safety Precautions
       6. Conclusion/Result
-      Use Markdown formatting.`;
+      Use Markdown formatting. Maintain technical accuracy.`;
     } else {
       prompt = `Generate a Digital Content Brief for an e-learning module. Trade: ${trade}. Topic: ${topic}.
+      Language: ${language}.
       Include:
       1. Video Script Outline (Scene by Scene)
       2. Simulation Ideas (How to make it interactive)
       3. Key Visuals/Graphics needed
       4. Quiz points for the module
-      Use Markdown formatting.`;
+      Use Markdown formatting. Maintain technical accuracy.`;
     }
 
-    const result = await this.gemini.generateContent(prompt);
+    const [result, img] = await Promise.all([
+      this.gemini.generateContent(prompt),
+      includeImage ? this.gemini.generateImage(`A professional technical illustration for ${trade}: ${topic}. Clear, educational, and detailed.`) : Promise.resolve(null)
+    ]);
+
+    this.generatedImage.set(img);
+
     // Simple markdown to HTML conversion (basic)
     const html = result
       .replace(/^# (.*$)/gim, '<h1>$1</h1>')
       .replace(/^## (.*$)/gim, '<h2>$1</h2>')
       .replace(/^### (.*$)/gim, '<h3>$1</h3>')
+      .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
       .replace(/^\* (.*$)/gim, '<li>$1</li>')
       .replace(/^- (.*$)/gim, '<li>$1</li>')
       .replace(/\n/g, '<br/>');
@@ -199,6 +254,38 @@ export class Generator {
   }
 
   download() {
-    alert("PDF Download feature would be integrated here using a library like jspdf.");
+    if (!this.content()) return;
+
+    const htmlContent = `
+      <!DOCTYPE html>
+      <html>
+      <head>
+        <meta charset="UTF-8">
+        <title>NIMI Content - ${this.form.value.topic}</title>
+        <style>
+          body { font-family: sans-serif; line-height: 1.6; color: #333; max-width: 800px; margin: 40px auto; padding: 20px; }
+          h1 { color: #1e3a8a; border-bottom: 2px solid #1e3a8a; padding-bottom: 10px; }
+          h2 { color: #1e40af; margin-top: 30px; }
+          h3 { color: #1e3a8a; }
+          .image-container { text-align: center; margin: 30px 0; }
+          img { max-width: 100%; height: auto; border-radius: 8px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); }
+          .footer { margin-top: 50px; font-size: 12px; color: #666; text-align: center; border-top: 1px solid #eee; padding-top: 20px; }
+        </style>
+      </head>
+      <body>
+        ${this.generatedImage() ? `<div class="image-container"><img src="${this.generatedImage()}" alt="Technical Illustration"></div>` : ''}
+        ${this.content()}
+        <div class="footer">Generated by NIMI AI Curriculum Architect</div>
+      </body>
+      </html>
+    `;
+
+    const blob = new Blob([htmlContent], { type: 'text/html' });
+    const url = window.URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `NIMI_${this.form.value.topic?.replace(/\s+/g, '_')}.html`;
+    a.click();
+    window.URL.revokeObjectURL(url);
   }
 }

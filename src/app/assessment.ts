@@ -25,7 +25,7 @@ interface Question {
       </header>
 
       <div class="bg-white p-8 rounded-3xl shadow-sm border border-slate-200">
-        <form [formGroup]="form" (ngSubmit)="generate()" class="grid md:grid-cols-4 gap-6 items-end">
+        <form [formGroup]="form" (ngSubmit)="generate()" class="grid md:grid-cols-5 gap-6 items-end">
           <div class="md:col-span-1 space-y-1">
             <label for="trade" class="text-xs font-bold uppercase text-slate-500">Trade</label>
             <input id="trade" formControlName="trade" placeholder="e.g. Electrician" class="w-full px-4 py-2 rounded-lg border border-slate-200 outline-none focus:ring-2 focus:ring-nimi-blue" />
@@ -35,10 +35,38 @@ interface Question {
             <input id="topic" formControlName="topic" placeholder="e.g. AC Motors" class="w-full px-4 py-2 rounded-lg border border-slate-200 outline-none focus:ring-2 focus:ring-nimi-blue" />
           </div>
           <div class="md:col-span-1 space-y-1">
-            <label for="count" class="text-xs font-bold uppercase text-slate-500">Question Count</label>
+            <label for="count" class="text-xs font-bold uppercase text-slate-500">Count</label>
             <select id="count" formControlName="count" class="w-full px-4 py-2 rounded-lg border border-slate-200 outline-none focus:ring-2 focus:ring-nimi-blue">
-              <option [value]="5">5 Questions</option>
-              <option [value]="10">10 Questions</option>
+              <option [value]="5">5 Qs</option>
+              <option [value]="10">10 Qs</option>
+            </select>
+          </div>
+          <div class="md:col-span-1 space-y-1">
+            <label for="language" class="text-xs font-bold uppercase text-slate-500">Language</label>
+            <select id="language" formControlName="language" class="w-full px-4 py-2 rounded-lg border border-slate-200 outline-none focus:ring-2 focus:ring-nimi-blue">
+              <optgroup label="Indian Regional">
+                <option value="English">English</option>
+                <option value="Hindi">Hindi</option>
+                <option value="Tamil">Tamil</option>
+                <option value="Telugu">Telugu</option>
+                <option value="Marathi">Marathi</option>
+                <option value="Bengali">Bengali</option>
+                <option value="Gujarati">Gujarati</option>
+                <option value="Kannada">Kannada</option>
+                <option value="Malayalam">Malayalam</option>
+                <option value="Punjabi">Punjabi</option>
+              </optgroup>
+              <optgroup label="International">
+                <option value="Spanish">Spanish</option>
+                <option value="French">French</option>
+                <option value="German">German</option>
+                <option value="Arabic">Arabic</option>
+                <option value="Japanese">Japanese</option>
+                <option value="Russian">Russian</option>
+                <option value="Portuguese">Portuguese</option>
+                <option value="Korean">Korean</option>
+                <option value="Chinese (Mandarin)">Chinese (Mandarin)</option>
+              </optgroup>
             </select>
           </div>
           <button 
@@ -65,9 +93,14 @@ interface Question {
               <span class="text-xs font-medium text-orange-700 bg-orange-100 px-2 py-0.5 rounded">Medium: {{ getCount('Medium') }}</span>
               <span class="text-xs font-medium text-red-700 bg-red-100 px-2 py-0.5 rounded">Hard: {{ getCount('Hard') }}</span>
             </div>
-            <button (click)="showAnswers.set(!showAnswers())" class="text-xs font-bold text-nimi-blue hover:underline">
-              {{ showAnswers() ? 'Hide' : 'Show' }} Answers
-            </button>
+            <div class="flex gap-4 items-center">
+              <button (click)="download()" class="flex items-center gap-1 text-xs font-bold text-nimi-blue hover:underline">
+                <mat-icon class="!text-sm">download</mat-icon> Download
+              </button>
+              <button (click)="showAnswers.set(!showAnswers())" class="text-xs font-bold text-nimi-blue hover:underline">
+                {{ showAnswers() ? 'Hide' : 'Show' }} Answers
+              </button>
+            </div>
           </div>
 
           @for (q of questions(); track $index) {
@@ -140,12 +173,14 @@ export class Assessment {
   form = this.fb.group({
     trade: ['', Validators.required],
     topic: ['', Validators.required],
-    count: [5, Validators.required]
+    count: [5, Validators.required],
+    language: ['English', Validators.required]
   });
 
   loading = signal(false);
   questions = signal<Question[]>([]);
   showAnswers = signal(false);
+  generatedImage = signal<string | null>(null);
 
   getCount(diff: string) {
     return this.questions().filter(q => q.difficulty === diff).length;
@@ -166,9 +201,11 @@ export class Assessment {
     this.loading.set(true);
     this.questions.set([]);
     this.showAnswers.set(false);
+    this.generatedImage.set(null);
 
-    const { trade, topic, count } = this.form.value;
+    const { trade, topic, count, language } = this.form.value;
     const prompt = `Generate ${count} high-quality multiple choice questions for the ITI trade: ${trade} on the topic: ${topic}. 
+    Language: ${language}.
     For each question:
     1. Provide 4 options, 1 correct answer (index 0-3).
     2. Tag difficulty as 'Easy', 'Medium', or 'Hard'.
@@ -197,10 +234,79 @@ export class Assessment {
       }
     };
 
-    const result = await this.gemini.generateJson<Question[]>(prompt, schema);
+    const [result, img] = await Promise.all([
+      this.gemini.generateJson<Question[]>(prompt, schema),
+      this.gemini.generateImage(`A professional technical diagram for a mock test on ${trade}: ${topic}. Clear, educational.`)
+    ]);
+
     if (result) {
       this.questions.set(result);
     }
+    this.generatedImage.set(img);
     this.loading.set(false);
+  }
+
+  download() {
+    if (this.questions().length === 0) return;
+
+    const htmlContent = `
+      <!DOCTYPE html>
+      <html>
+      <head>
+        <meta charset="UTF-8">
+        <title>NIMI Mock Test - ${this.form.value.topic}</title>
+        <style>
+          body { font-family: sans-serif; line-height: 1.6; color: #333; max-width: 800px; margin: 40px auto; padding: 20px; }
+          .header { text-align: center; border-bottom: 2px solid #1e3a8a; padding-bottom: 20px; margin-bottom: 40px; }
+          h1 { color: #1e3a8a; margin: 0; }
+          .meta { font-size: 14px; color: #666; margin-top: 10px; }
+          .question { margin-bottom: 40px; page-break-inside: avoid; }
+          .q-text { font-weight: bold; margin-bottom: 15px; }
+          .options { list-style-type: none; padding-left: 0; }
+          .option { padding: 8px 15px; border: 1px solid #eee; margin-bottom: 5px; border-radius: 4px; }
+          .answer-key { margin-top: 60px; border-top: 2px solid #eee; padding-top: 20px; }
+          .ans-item { margin-bottom: 10px; font-size: 14px; }
+          .image-container { text-align: center; margin: 30px 0; }
+          img { max-width: 100%; height: auto; border-radius: 8px; }
+        </style>
+      </head>
+      <body>
+        <div class="header">
+          <h1>NIMI Mock Test: ${this.form.value.topic}</h1>
+          <div class="meta">Trade: ${this.form.value.trade} | Language: ${this.form.value.language}</div>
+        </div>
+
+        ${this.generatedImage() ? `<div class="image-container"><img src="${this.generatedImage()}" alt="Technical Diagram"></div>` : ''}
+
+        ${this.questions().map((q, i) => `
+          <div class="question">
+            <div class="q-text">${i + 1}. ${q.question}</div>
+            <div class="options">
+              ${q.options.map((opt, oi) => `
+                <div class="option">${['A','B','C','D'][oi]}. ${opt}</div>
+              `).join('')}
+            </div>
+          </div>
+        `).join('')}
+
+        <div class="answer-key">
+          <h2>Answer Key</h2>
+          ${this.questions().map((q, i) => `
+            <div class="ans-item">
+              <strong>Q${i + 1}:</strong> ${['A','B','C','D'][q.correctAnswer]} - ${q.explanation}
+            </div>
+          `).join('')}
+        </div>
+      </body>
+      </html>
+    `;
+
+    const blob = new Blob([htmlContent], { type: 'text/html' });
+    const url = window.URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `NIMI_Test_${this.form.value.topic?.replace(/\s+/g, '_')}.html`;
+    a.click();
+    window.URL.revokeObjectURL(url);
   }
 }
