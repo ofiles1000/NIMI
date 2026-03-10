@@ -158,6 +158,19 @@ export class Home {
         "Synthesia & HeyGen video scripts",
         "ElevenLabs & Midjourney technical prompts"
       ]
+    },
+    {
+      category: "Integration",
+      title: "NIMI Power Stack: Best-in-Class AI",
+      icon: "settings_input_component",
+      link: "/integrations",
+      description: "Explore the full stack of AI tools integrated or partnered with NIMI to deliver world-class vocational training.",
+      points: [
+        "Multi-model orchestration (Gemini, Claude, GPT)",
+        "Linguistic excellence (Bhashini, Azure)",
+        "Media & Avatar production (HeyGen, Synthesia)",
+        "Assessment intelligence (PrepAI, Quizgecko)"
+      ]
     }
   ];
 }

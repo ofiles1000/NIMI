@@ -21,7 +21,9 @@ interface Question {
     <div class="max-w-5xl mx-auto py-12 px-4 space-y-8">
       <header class="text-center space-y-2">
         <h1 class="text-3xl font-bold text-slate-900">CTS/CITS Question Bank Architect</h1>
-        <p class="text-slate-600">Generate high-quality, tagged assessments for vocational certification.</p>
+        <p class="text-slate-600">
+          Powered by PrepAI & Quizgecko style intelligence for automated MCQ generation and competency mapping.
+        </p>
       </header>
 
       <div class="bg-white p-8 rounded-3xl shadow-sm border border-slate-200 space-y-6">

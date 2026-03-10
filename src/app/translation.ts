@@ -14,7 +14,9 @@ import { Gemini } from './gemini';
           <mat-icon class="text-nimi-blue">translate</mat-icon>
           Technical Localization & Translation
         </h1>
-        <p class="text-slate-600">Translate technical vocational content into regional and international languages with AI precision.</p>
+        <p class="text-slate-600">
+          Powered by Bhashini & Azure AI Translator for high-precision technical translation in 22+ languages.
+        </p>
       </header>
 
       <div class="grid md:grid-cols-2 gap-8">

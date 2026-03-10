@@ -260,64 +260,80 @@ export class MediaStudio implements OnInit {
     const { trade, topic, type, language } = this.form.value;
     const context = this.fileContent() ? `\n\nReference Document Content:\n${this.fileContent()}` : '';
 
+    if (type === 'gen-image') {
+      const prompt = `A professional, high-quality, standardized technical illustration for ITI Trade: ${trade || 'General'}. Topic: ${topic || 'General'}. Clear, educational, and detailed. ${context || ''}`;
+      const img = await this.gemini.generateImage(prompt);
+      if (img) {
+        this.generatedImage.set(img);
+      } else {
+        // Fallback to text brief if image fails
+        console.warn("Image generation failed, falling back to text brief.");
+        await this.generateTextBrief('graphics', trade || '', topic || '', language || 'English', context || '');
+      }
+    } else if (type === 'gen-video') {
+      const prompt = `A short, educational, humanized 3D animation clip demonstrating ${topic || 'core skills'} for the ${trade || 'General'} trade. High quality, technical, and clear. ${context || ''}`;
+      const video = await this.gemini.generateVideo(prompt);
+      if (video) {
+        this.generatedVideo.set(video);
+      } else {
+        // Fallback to text brief if video fails
+        console.warn("Video generation failed, falling back to text brief.");
+        await this.generateTextBrief('animation', trade || '', topic || '', language || 'English', context || '');
+      }
+    } else {
+      await this.generateTextBrief(type || 'video', trade || '', topic || '', language || 'English', context || '');
+    }
+
+    this.loading.set(false);
+  }
+
+  private async generateTextBrief(type: string, trade: string, topic: string, language: string, context: string) {
     const baseInstruction = `Generate high-quality, humanized, and standardized media content for the ITI trade: ${trade}. 
     Topic: ${topic || 'General Trade Overview'}.
     Language: ${language}.
     ${context}`;
 
-    if (type === 'gen-image') {
-      const prompt = `A professional, high-quality, standardized technical illustration for ITI Trade: ${trade}. Topic: ${topic || 'General'}. Clear, educational, and detailed. ${context}`;
-      const img = await this.gemini.generateImage(prompt);
-      this.generatedImage.set(img);
-    } else if (type === 'gen-video') {
-      const prompt = `A short, educational, humanized 3D animation clip demonstrating ${topic || 'core skills'} for the ${trade} trade. High quality, technical, and clear. ${context}`;
-      const video = await this.gemini.generateVideo(prompt);
-      this.generatedVideo.set(video);
+    let prompt = "";
+    if (type === 'video') {
+      prompt = `${baseInstruction}
+      Format: Professional Demo Video Script.
+      Include:
+      1. Humanized Scene-by-scene breakdown (Visuals vs Audio/Narration).
+      2. Time estimates for each scene.
+      3. Key safety callouts (Standardized).
+      4. On-screen text/graphics overlay suggestions.
+      Use Markdown formatting.`;
+    } else if (type === 'animation') {
+      prompt = `${baseInstruction}
+      Format: 3D Animation Storyboard.
+      Include:
+      1. Technical breakdown of the 3D model needed (Standardized).
+      2. Humanized Animation sequence (how parts move, rotate, or highlight).
+      3. Camera angles and lighting suggestions.
+      4. Educational, easy-to-understand voiceover script.
+      Use Markdown formatting.`;
     } else {
-      let prompt = "";
-      if (type === 'video') {
-        prompt = `${baseInstruction}
-        Format: Professional Demo Video Script.
-        Include:
-        1. Humanized Scene-by-scene breakdown (Visuals vs Audio/Narration).
-        2. Time estimates for each scene.
-        3. Key safety callouts (Standardized).
-        4. On-screen text/graphics overlay suggestions.
-        Use Markdown formatting.`;
-      } else if (type === 'animation') {
-        prompt = `${baseInstruction}
-        Format: 3D Animation Storyboard.
-        Include:
-        1. Technical breakdown of the 3D model needed (Standardized).
-        2. Humanized Animation sequence (how parts move, rotate, or highlight).
-        3. Camera angles and lighting suggestions.
-        4. Educational, easy-to-understand voiceover script.
-        Use Markdown formatting.`;
-      } else {
-        prompt = `${baseInstruction}
-        Format: 2D Graphic Prompts and Layouts.
-        Include:
-        1. Detailed prompts for AI Image Generators to create standardized technical diagrams.
-        2. Humanized Infographic layout structure.
-        3. Labeling requirements for parts.
-        4. Color palette suggestions for technical clarity.
-        Use Markdown formatting.`;
-      }
-
-      const content = await this.gemini.generateContent(prompt);
-      const html = content
-        .replace(/^# (.*$)/gim, '<h1>$1</h1>')
-        .replace(/^## (.*$)/gim, '<h2>$1</h2>')
-        .replace(/^### (.*$)/gim, '<h3>$1</h3>')
-        .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
-        .replace(/^\* (.*$)/gim, '<li>$1</li>')
-        .replace(/^- (.*$)/gim, '<li>$1</li>')
-        .replace(/\n/g, '<br/>');
-
-      this.result.set(html);
+      prompt = `${baseInstruction}
+      Format: 2D Graphic Prompts and Layouts.
+      Include:
+      1. Detailed prompts for AI Image Generators to create standardized technical diagrams.
+      2. Humanized Infographic layout structure.
+      3. Labeling requirements for parts.
+      4. Color palette suggestions for technical clarity.
+      Use Markdown formatting.`;
     }
 
-    this.loading.set(false);
+    const content = await this.gemini.generateContent(prompt);
+    const html = content
+      .replace(/^# (.*$)/gim, '<h1>$1</h1>')
+      .replace(/^## (.*$)/gim, '<h2>$1</h2>')
+      .replace(/^### (.*$)/gim, '<h3>$1</h3>')
+      .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
+      .replace(/^\* (.*$)/gim, '<li>$1</li>')
+      .replace(/^- (.*$)/gim, '<li>$1</li>')
+      .replace(/\n/g, '<br/>');
+
+    this.result.set(html);
   }
 
   copy() {

@@ -49,6 +49,10 @@ import { CommonModule } from '@angular/common';
                   <mat-icon class="!text-lg">hub</mat-icon>
                   AI Ecosystem
                 </a>
+                <a routerLink="/integrations" routerLinkActive="bg-slate-100 text-nimi-blue" class="px-4 py-2 rounded-lg text-sm font-medium text-slate-600 hover:bg-slate-50 transition-colors flex items-center gap-2">
+                  <mat-icon class="!text-lg">settings_input_component</mat-icon>
+                  Power Stack
+                </a>
               </div>
             </div>
             

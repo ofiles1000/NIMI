@@ -136,45 +136,52 @@ export class Ecosystem {
   categories: PromptCategory[] = [
     { 
       id: 'content', 
-      name: 'Content & Drafting', 
+      name: 'Drafting & Structuring', 
       icon: 'edit_note', 
-      tools: ['NotebookLM', 'Microsoft Copilot', 'Claude 3'],
+      tools: ['Microsoft Copilot', 'Claude 3', 'Notion AI', 'Writer.com', 'Jasper AI'],
       description: 'Prompts for deep research, drafting, and structuring technical manuals.'
     },
     { 
       id: 'translation', 
-      name: 'Translation & Localization', 
+      name: 'Translation & Terminology', 
       icon: 'translate', 
-      tools: ['Bhashini', 'Azure AI Translator'],
+      tools: ['Bhashini', 'Azure AI Translator', 'DeepL Pro'],
       description: 'Prompts to ensure technical terminology is preserved during regional translation.'
     },
     { 
       id: 'assessment', 
-      name: 'Question Banks', 
+      name: 'Assessments & MCQs', 
       icon: 'quiz', 
-      tools: ['PrepAI', 'OpenAI API'],
-      description: 'Prompts for generating high-quality MCQs and numerical problems.'
+      tools: ['PrepAI', 'OpenAI API', 'Quizgecko'],
+      description: 'Prompts for generating high-quality MCQs, numericals, and auto-tagging.'
     },
     { 
       id: 'video', 
-      name: 'Video Production', 
+      name: 'Video & Avatar Production', 
       icon: 'movie', 
-      tools: ['Synthesia', 'HeyGen'],
-      description: 'Prompts for AI avatar scripts and instructional video pacing.'
+      tools: ['Synthesia', 'HeyGen', 'Runway ML', 'Pika Labs', 'Kaiber AI'],
+      description: 'Prompts for AI avatar scripts, instructional videos, and storyboards.'
     },
     { 
       id: 'voice', 
-      name: 'Voice Generation', 
+      name: 'Multilingual Voiceovers', 
       icon: 'record_voice_over', 
       tools: ['ElevenLabs', 'Murf.ai'],
       description: 'Prompts for natural-sounding multilingual technical narrations.'
     },
     { 
       id: 'design', 
-      name: 'Graphics & Design', 
+      name: 'Graphics & Storyboarding', 
       icon: 'palette', 
-      tools: ['Canva Magic Studio', 'Midjourney'],
+      tools: ['Canva Magic Studio', 'Midjourney', 'Stable Diffusion', 'Storyboard That', 'Boords'],
       description: 'Prompts for 2D illustrations, safety posters, and technical diagrams.'
+    },
+    { 
+      id: 'orchestration', 
+      name: 'Frameworks & Prompting', 
+      icon: 'terminal', 
+      tools: ['LangChain', 'LlamaIndex', 'Microsoft Copilot Studio', 'PromptPerfect', 'FlowGPT'],
+      description: 'Prompts for building custom AI agents and optimizing prompt performance.'
     }
   ];
 
@@ -193,15 +200,16 @@ export class Ecosystem {
     For each category, provide ONE highly optimized prompt that can be used in the specified tools.
     
     Categories:
-    1. Content Creation (NotebookLM, Copilot, Claude): For drafting technical manuals.
-    2. Translation (Bhashini, Azure): For technical localization.
-    3. Question Banks (PrepAI): For MCQ generation.
-    4. Video Production (Synthesia, HeyGen): For avatar-based demo scripts.
+    1. Drafting & Structuring (Copilot, Claude, Notion AI, Writer.com): For drafting technical manuals.
+    2. Translation (Bhashini, Azure, DeepL): For technical localization.
+    3. Assessments (PrepAI, OpenAI, Quizgecko): For MCQ generation and auto-tagging.
+    4. Video Production (Synthesia, HeyGen, Runway, Pika): For avatar-based demo scripts and storyboards.
     5. Voice Generation (ElevenLabs, Murf): For technical narration.
-    6. Graphics (Canva, Midjourney): For technical illustrations.
+    6. Graphics (Canva, Midjourney, Stable Diffusion, Storyboard That): For technical illustrations.
+    7. Orchestration (LangChain, LlamaIndex, Copilot Studio, PromptPerfect): For building custom AI agents.
     
     Return the result as a JSON array of objects with 'categoryId' and 'prompt' fields.
-    Category IDs: content, translation, assessment, video, voice, design.`;
+    Category IDs: content, translation, assessment, video, voice, design, orchestration.`;
 
     const schema = {
       type: 'ARRAY',
